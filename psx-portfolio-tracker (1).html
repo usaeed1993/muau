@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PSX Portfolio Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:#0d1117;--surface:#161b22;--card:#1c2430;--border:#2a3444;
+    --accent:#00c896;--accent2:#00a37a;--red:#ff4d6d;--yellow:#f7c948;
+    --blue:#5ba3f5;--text:#e6edf3;--muted:#7d8fa0;
+    --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;}
+
+  /* ── LOCK SCREEN ── */
+  #lockScreen{
+    position:fixed;inset:0;background:var(--bg);z-index:9999;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .lock-box{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    padding:40px;width:min(380px,92vw);text-align:center;
+  }
+  .lock-logo{
+    width:56px;height:56px;background:var(--accent);border-radius:12px;
+    display:grid;place-items:center;font-family:var(--mono);font-weight:600;
+    font-size:18px;color:#000;margin:0 auto 20px;
+  }
+  .lock-title{font-size:20px;font-weight:600;margin-bottom:6px;}
+  .lock-sub{color:var(--muted);font-size:13px;margin-bottom:28px;}
+  .lock-input{
+    width:100%;background:var(--surface);border:1px solid var(--border);
+    color:var(--text);font-family:var(--mono);font-size:16px;
+    padding:12px 14px;border-radius:8px;outline:none;
+    text-align:center;letter-spacing:4px;margin-bottom:14px;
+    transition:border-color .2s;
+  }
+  .lock-input:focus{border-color:var(--accent);}
+  .lock-btn{
+    width:100%;background:var(--accent);color:#000;border:none;
+    font-family:var(--mono);font-weight:600;font-size:14px;
+    padding:12px;border-radius:8px;cursor:pointer;transition:background .2s;
+  }
+  .lock-btn:hover{background:var(--accent2);}
+  .lock-err{color:var(--red);font-size:12px;margin-top:10px;min-height:18px;font-family:var(--mono);}
+  .lock-hint{color:var(--muted);font-size:11px;margin-top:16px;}
+  .lock-setup{margin-top:20px;padding-top:20px;border-top:1px solid var(--border);}
+  .lock-setup-title{font-size:12px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.6px;}
+
+  /* ── HEADER ── */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 28px;border-bottom:1px solid var(--border);
+    background:var(--surface);position:sticky;top:0;z-index:100;
+  }
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-mark{
+    width:34px;height:34px;background:var(--accent);border-radius:6px;
+    display:grid;place-items:center;font-family:var(--mono);font-weight:600;
+    font-size:13px;color:#000;letter-spacing:-0.5px;
+  }
+  .logo-text{font-weight:600;font-size:16px;letter-spacing:.2px;}
+  .logo-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+  .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .refresh-btn,.lock-btn-sm,.gdrive-btn{
+    background:var(--card);border:1px solid var(--border);
+    font-family:var(--mono);font-size:12px;padding:6px 12px;
+    border-radius:6px;cursor:pointer;transition:background .2s;white-space:nowrap;
+  }
+  .refresh-btn{color:var(--accent);}
+  .lock-btn-sm{color:var(--muted);}
+  .gdrive-btn{color:var(--blue);}
+  .refresh-btn:hover,.lock-btn-sm:hover,.gdrive-btn:hover{background:var(--border);}
+  .last-update{font-size:11px;color:var(--muted);font-family:var(--mono);}
+
+  /* ── TABS ── */
+  nav{display:flex;gap:2px;padding:0 28px;background:var(--surface);border-bottom:1px solid var(--border);}
+  .tab{
+    padding:11px 18px;font-size:13px;font-weight:500;color:var(--muted);
+    cursor:pointer;border-bottom:2px solid transparent;
+    transition:color .2s,border-color .2s;white-space:nowrap;
+  }
+  .tab.active{color:var(--accent);border-color:var(--accent);}
+  .tab:hover:not(.active){color:var(--text);}
+
+  /* ── LAYOUT ── */
+  main{padding:24px 28px;max-width:1400px;margin:0 auto;}
+  .page{display:none;}.page.active{display:block;}
+
+  /* ── STAT CARDS ── */
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px;}
+  .stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+  .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+  .stat-value{font-family:var(--mono);font-size:22px;font-weight:600;}
+  .stat-sub{font-size:11px;color:var(--muted);margin-top:4px;font-family:var(--mono);}
+  .pos{color:var(--accent);}.neg{color:var(--red);}.neu{color:var(--yellow);}
+
+  /* ── SECTION HEADERS ── */
+  .section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .section-title{font-size:14px;font-weight:600;letter-spacing:.3px;}
+  .badge{background:var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:4px;}
+
+  /* ── TABLES ── */
+  .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px;}
+  table{width:100%;border-collapse:collapse;}
+  th{
+    text-align:left;padding:11px 14px;font-size:11px;font-weight:600;
+    color:var(--muted);text-transform:uppercase;letter-spacing:.7px;
+    border-bottom:1px solid var(--border);background:var(--surface);white-space:nowrap;
+  }
+  td{padding:11px 14px;border-bottom:1px solid #1e2736;font-family:var(--mono);font-size:13px;white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .symbol-badge{background:#1e3a2e;color:var(--accent);padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;}
+  .action-btns{display:flex;gap:6px;}
+  .btn-sm{padding:4px 10px;border-radius:5px;font-size:11px;font-family:var(--mono);cursor:pointer;border:1px solid;transition:opacity .2s;}
+  .btn-sm:hover{opacity:.75;}
+  .btn-edit{background:transparent;border-color:var(--muted);color:var(--muted);}
+  .btn-del{background:transparent;border-color:var(--red);color:var(--red);}
+
+  /* ── FORMS ── */
+  .form-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:24px;}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+  .form-group{display:flex;flex-direction:column;gap:5px;}
+  label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+  input,select{
+    background:var(--surface);border:1px solid var(--border);color:var(--text);
+    font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:6px;
+    outline:none;transition:border-color .2s;
+  }
+  input:focus,select:focus{border-color:var(--accent);}
+  select option{background:var(--surface);}
+  .form-actions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;}
+  .btn-primary{
+    background:var(--accent);color:#000;border:none;font-family:var(--mono);
+    font-weight:600;font-size:13px;padding:9px 20px;border-radius:7px;
+    cursor:pointer;transition:background .2s;
+  }
+  .btn-primary:hover{background:var(--accent2);}
+  .btn-secondary{
+    background:transparent;color:var(--muted);border:1px solid var(--border);
+    font-family:var(--mono);font-size:13px;padding:9px 20px;border-radius:7px;cursor:pointer;
+  }
+  .btn-secondary:hover{border-color:var(--muted);color:var(--text);}
+  .btn-blue{
+    background:transparent;color:var(--blue);border:1px solid var(--blue);
+    font-family:var(--mono);font-size:13px;padding:9px 20px;border-radius:7px;cursor:pointer;
+  }
+  .btn-blue:hover{background:rgba(91,163,245,.1);}
+
+  /* ── LIVE DOT ── */
+  .live-dot{display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-right:5px;animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* ── PRICE LOOKUP ── */
+  .price-lookup{display:flex;gap:10px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;}
+  .price-lookup .form-group{flex:1;max-width:220px;}
+  .price-result{
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:10px 16px;font-family:var(--mono);font-size:13px;min-width:200px;color:var(--muted);
+  }
+
+  /* ── EMPTY ── */
+  .empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;}
+  .empty-icon{font-size:32px;margin-bottom:10px;}
+
+  /* ── DIV BADGES ── */
+  .div-type{font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600;}
+  .div-cash{background:#1e3a2e;color:var(--accent);}
+  .div-bonus{background:#1e2e4a;color:var(--blue);}
+  .div-rights{background:#3a2e1e;color:var(--yellow);}
+
+  /* ── NOTIFICATION ── */
+  .notification{
+    position:fixed;bottom:20px;right:20px;background:var(--card);
+    border:1px solid var(--accent);color:var(--accent);padding:10px 18px;
+    border-radius:8px;font-family:var(--mono);font-size:13px;z-index:9998;
+    opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;
+  }
+  .notification.show{opacity:1;transform:translateY(0);}
+
+  /* ── MODAL ── */
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;place-items:center;}
+  .modal-bg.open{display:grid;}
+  .modal{
+    background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:24px;width:min(500px,92vw);max-height:90vh;overflow-y:auto;
+  }
+  .modal-title{font-size:16px;font-weight:600;margin-bottom:18px;}
+  .modal-actions{margin-top:18px;display:flex;justify-content:flex-end;gap:10px;}
+
+  /* ── GDRIVE SECTION ── */
+  .gdrive-info{
+    background:rgba(91,163,245,.07);border:1px solid rgba(91,163,245,.25);
+    border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:12px;
+    color:var(--muted);line-height:1.6;
+  }
+  .gdrive-info strong{color:var(--blue);}
+  .gdrive-steps{margin-top:8px;padding-left:16px;}
+  .gdrive-steps li{margin-bottom:4px;}
+
+  /* ── SETTINGS PAGE ── */
+  .settings-grid{display:grid;gap:20px;}
+  .settings-section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;}
+  .settings-section-title{font-size:13px;font-weight:600;margin-bottom:14px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;}
+
+  @media(max-width:600px){
+    main{padding:16px;}
+    header{padding:12px 16px;}
+    nav{padding:0 16px;overflow-x:auto;}
+    .stat-row{grid-template-columns:1fr 1fr;}
+    .header-right{gap:6px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════ LOCK SCREEN ══════════════════════════════ -->
+<div id="lockScreen">
+  <div class="lock-box">
+    <div class="lock-logo">PSX</div>
+    <div class="lock-title">Portfolio Tracker</div>
+    <div class="lock-sub" id="lockSub">Enter your password to continue</div>
+    <input class="lock-input" type="password" id="lockInput" placeholder="••••••••"
+      onkeydown="if(event.key==='Enter')unlockApp()" autocomplete="current-password"/>
+    <button class="lock-btn" onclick="unlockApp()">Unlock</button>
+    <div class="lock-err" id="lockErr"></div>
+    <div class="lock-hint" id="lockHint"></div>
+    <div class="lock-setup" id="lockSetup" style="display:none">
+      <div class="lock-setup-title">Set a new password</div>
+      <input class="lock-input" type="password" id="newPwd1" placeholder="New password" style="margin-bottom:8px;letter-spacing:normal"/>
+      <input class="lock-input" type="password" id="newPwd2" placeholder="Confirm password" style="margin-bottom:12px;letter-spacing:normal"/>
+      <button class="lock-btn" onclick="savePassword()">Save Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATION -->
+<div class="notification" id="notif"></div>
+
+<!-- EDIT MODAL -->
+<div class="modal-bg" id="editModal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Edit</div>
+    <div class="form-grid" id="modalFormGrid"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- GDRIVE IMPORT MODAL -->
+<div class="modal-bg" id="gdriveModal">
+  <div class="modal">
+    <div class="modal-title">📂 Import from Google Drive</div>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:14px;">
+      Paste the contents of your exported PSX backup JSON file below:
+    </p>
+    <textarea id="importJson" style="
+      width:100%;height:140px;background:var(--surface);border:1px solid var(--border);
+      color:var(--text);font-family:var(--mono);font-size:12px;padding:10px;
+      border-radius:6px;outline:none;resize:vertical;
+    " placeholder='{"transactions":[...],"dividends":[...]}'></textarea>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeGdriveModal()">Cancel</button>
+      <button class="btn-primary" onclick="doImport()">Import Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">PSX</div>
+    <div>
+      <div class="logo-text">Portfolio Tracker</div>
+      <div class="logo-sub">Pakistan Stock Exchange</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="last-update" id="lastUpdate">Prices not fetched</span>
+    <button class="gdrive-btn" onclick="exportToGDrive()">☁ Export → Drive</button>
+    <button class="gdrive-btn" onclick="openGdriveModal()">📂 Import ← Drive</button>
+    <button class="refresh-btn" onclick="fetchAllPrices()">⟳ Refresh Prices</button>
+    <button class="lock-btn-sm" onclick="lockApp()">🔒 Lock</button>
+  </div>
+</header>
+
+<!-- TABS -->
+<nav>
+  <div class="tab active" onclick="switchTab('portfolio')">Portfolio</div>
+  <div class="tab" onclick="switchTab('transactions')">Transactions</div>
+  <div class="tab" onclick="switchTab('dividends')">Dividends & Actions</div>
+  <div class="tab" onclick="switchTab('priceLookup')">Price Lookup</div>
+  <div class="tab" onclick="switchTab('settings')">⚙ Settings</div>
+</nav>
+
+<main>
+
+<!-- ══════════════ PORTFOLIO ══════════════ -->
+<div class="page active" id="page-portfolio">
+  <div class="stat-row">
+    <div class="stat-card"><div class="stat-label">Invested</div><div class="stat-value" id="sum-invested">PKR 0</div><div class="stat-sub">Total cost basis</div></div>
+    <div class="stat-card"><div class="stat-label">Market Value</div><div class="stat-value" id="sum-mktval">PKR 0</div><div class="stat-sub"><span class="live-dot"></span>Live prices</div></div>
+    <div class="stat-card"><div class="stat-label">Unrealised P&L</div><div class="stat-value" id="sum-pnl">PKR 0</div><div class="stat-sub" id="sum-pnl-pct">0.00%</div></div>
+    <div class="stat-card"><div class="stat-label">Realised P&L</div><div class="stat-value" id="sum-realised">PKR 0</div><div class="stat-sub">From closed positions</div></div>
+    <div class="stat-card"><div class="stat-label">Dividends Earned</div><div class="stat-value pos" id="sum-div">PKR 0</div><div class="stat-sub">Cash received</div></div>
+    <div class="stat-card"><div class="stat-label">Holdings</div><div class="stat-value" id="sum-count">0</div><div class="stat-sub">Active symbols</div></div>
+  </div>
+  <div class="section-head">
+    <span class="section-title">Holdings</span>
+    <span class="badge" id="holdingsBadge">0 stocks</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Symbol</th><th>Shares</th><th>Avg Cost</th><th>Invested</th><th>Live Price</th><th>Market Value</th><th>Unrealised P&L</th><th>P&L %</th><th>Day Change</th></tr></thead>
+      <tbody id="holdingsBody"><tr><td colspan="9"><div class="empty"><div class="empty-icon">📊</div>No holdings yet — add a transaction to get started.</div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════ TRANSACTIONS ══════════════ -->
+<div class="page" id="page-transactions">
+  <div class="form-card">
+    <div class="section-head" style="margin-bottom:14px"><span class="section-title">Add Transaction</span></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Symbol</label><input id="t-symbol" type="text" placeholder="e.g. ENGRO" oninput="this.value=this.value.toUpperCase()"/></div>
+      <div class="form-group"><label>Type</label><select id="t-type"><option value="buy">Buy</option><option value="sell">Sell</option></select></div>
+      <div class="form-group"><label>Date</label><input id="t-date" type="date"/></div>
+      <div class="form-group"><label>Shares</label><input id="t-shares" type="number" placeholder="500" min="0"/></div>
+      <div class="form-group"><label>Price per Share (PKR)</label><input id="t-price" type="number" placeholder="250.00" min="0" step="0.01"/></div>
+      <div class="form-group"><label>Brokerage (PKR)</label><input id="t-brokerage" type="number" placeholder="0.00" min="0" step="0.01" value="0"/></div>
+      <div class="form-group"><label>Notes</label><input id="t-notes" type="text" placeholder="Optional note"/></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="addTransaction()">Add Transaction</button>
+      <button class="btn-secondary" onclick="clearTransactionForm()">Clear</button>
+    </div>
+  </div>
+  <div class="section-head">
+    <span class="section-title">Transaction History</span>
+    <span class="badge" id="txBadge">0 records</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Symbol</th><th>Type</th><th>Shares</th><th>Price</th><th>Brokerage</th><th>Total</th><th>Notes</th><th>Actions</th></tr></thead>
+      <tbody id="txBody"><tr><td colspan="9"><div class="empty"><div class="empty-icon">📋</div>No transactions yet.</div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════ DIVIDENDS ══════════════ -->
+<div class="page" id="page-dividends">
+  <div class="form-card">
+    <div class="section-head" style="margin-bottom:14px"><span class="section-title">Add Dividend / Corporate Action</span></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Symbol</label><input id="d-symbol" type="text" placeholder="e.g. ENGRO" oninput="this.value=this.value.toUpperCase()"/></div>
+      <div class="form-group"><label>Type</label><select id="d-type" onchange="updateDivForm()"><option value="cash">Cash Dividend</option><option value="bonus">Bonus Shares</option><option value="rights">Rights Issue</option></select></div>
+      <div class="form-group"><label>Date</label><input id="d-date" type="date"/></div>
+      <div class="form-group" id="d-amount-group"><label id="d-amount-label">Amount per Share (PKR)</label><input id="d-amount" type="number" placeholder="2.50" min="0" step="0.01"/></div>
+      <div class="form-group"><label>Shares Held at Record Date</label><input id="d-shares-held" type="number" placeholder="1000" min="0"/></div>
+      <div class="form-group"><label>Notes</label><input id="d-notes" type="text" placeholder="Optional note"/></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="addDividend()">Add Record</button>
+      <button class="btn-secondary" onclick="clearDividendForm()">Clear</button>
+    </div>
+  </div>
+  <div class="section-head">
+    <span class="section-title">Dividend & Action History</span>
+    <span class="badge" id="divBadge">0 records</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Symbol</th><th>Type</th><th>Rate / Amount</th><th>Shares Held</th><th>Total Received</th><th>Notes</th><th>Actions</th></tr></thead>
+      <tbody id="divBody"><tr><td colspan="8"><div class="empty"><div class="empty-icon">💰</div>No dividends or corporate actions recorded.</div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════ PRICE LOOKUP ══════════════ -->
+<div class="page" id="page-priceLookup">
+  <div class="form-card">
+    <div class="section-head" style="margin-bottom:14px"><span class="section-title">Live PSX Price Lookup</span></div>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:14px;">
+      Prices sourced from Yahoo Finance (symbol + .KA suffix). Try: ENGRO, OGDC, HBL, MCB, LUCK, PSO, UBL, NESTLE, PPL.<br>
+      <span style="color:var(--yellow);">⚠ If lookup fails, use Manual Price Override below.</span>
+    </p>
+    <div class="price-lookup">
+      <div class="form-group"><label>Symbol</label><input id="lookup-symbol" type="text" placeholder="ENGRO" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')lookupPrice()"/></div>
+      <button class="btn-primary" onclick="lookupPrice()" style="height:36px">Lookup</button>
+      <div class="price-result" id="lookup-result">Enter a symbol and press Lookup</div>
+    </div>
+  </div>
+  <div class="form-card">
+    <div class="section-head" style="margin-bottom:10px"><span class="section-title">Manual Price Override</span></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Symbol</label><input id="mp-symbol" type="text" placeholder="ENGRO" oninput="this.value=this.value.toUpperCase()"/></div>
+      <div class="form-group"><label>Current Price (PKR)</label><input id="mp-price" type="number" placeholder="250.00" step="0.01"/></div>
+    </div>
+    <div class="form-actions"><button class="btn-primary" onclick="setManualPrice()">Set Price</button></div>
+  </div>
+  <div class="section-head"><span class="section-title">Stored Prices</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Symbol</th><th>Price (PKR)</th><th>Source</th><th>Updated</th></tr></thead>
+      <tbody id="priceBody"><tr><td colspan="4"><div class="empty"><div class="empty-icon">📡</div>No prices fetched yet.</div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════ SETTINGS ══════════════ -->
+<div class="page" id="page-settings">
+  <div class="settings-grid">
+
+    <!-- PASSWORD -->
+    <div class="settings-section">
+      <div class="settings-section-title">🔒 Password Protection</div>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">Change the password used to unlock this tracker. The password is hashed and stored locally — never sent anywhere.</p>
+      <div class="form-grid">
+        <div class="form-group"><label>Current Password</label><input type="password" id="s-cur-pwd" placeholder="Current password"/></div>
+        <div class="form-group"><label>New Password</label><input type="password" id="s-new-pwd1" placeholder="New password"/></div>
+        <div class="form-group"><label>Confirm New Password</label><input type="password" id="s-new-pwd2" placeholder="Confirm new password"/></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" onclick="changePassword()">Change Password</button>
+        <button class="btn-secondary" onclick="removePassword()">Remove Password</button>
+      </div>
+      <div id="pwd-msg" style="margin-top:10px;font-size:12px;font-family:var(--mono);"></div>
+    </div>
+
+    <!-- GOOGLE DRIVE BACKUP -->
+    <div class="settings-section">
+      <div class="settings-section-title">☁ Google Drive Backup</div>
+      <div class="gdrive-info">
+        <strong>How to sync with Google Drive:</strong>
+        <ol class="gdrive-steps">
+          <li>Click <strong>☁ Export → Drive</strong> in the header — your data downloads as a <code>.json</code> file.</li>
+          <li>Open <strong>drive.google.com</strong> and upload the file to a folder of your choice (e.g. <em>PSX Backups</em>).</li>
+          <li>To restore on any device: download the file from Drive, click <strong>📂 Import ← Drive</strong>, paste the file contents.</li>
+        </ol>
+        <br>
+        <strong>Auto-sync tip:</strong> If you have Google Drive desktop app installed, export directly into your Drive sync folder — it uploads automatically.
+      </div>
+      <div class="form-actions">
+        <button class="btn-blue" onclick="exportToGDrive()">☁ Export Backup Now</button>
+        <button class="btn-blue" onclick="openGdriveModal()">📂 Import from Backup</button>
+      </div>
+    </div>
+
+    <!-- DANGER ZONE -->
+    <div class="settings-section" style="border-color:rgba(255,77,109,.3)">
+      <div class="settings-section-title" style="color:var(--red)">⚠ Danger Zone</div>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">Permanently delete all data stored in this browser. Export a backup first!</p>
+      <div class="form-actions">
+        <button class="btn-secondary" style="border-color:var(--red);color:var(--red)" onclick="clearAllData()">Delete All Data</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════
+// PASSWORD / HASH
+// ═══════════════════════════════════════════════════
+async function hashPwd(pwd) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function initLock() {
+  const stored = localStorage.getItem('psx_pwd_hash');
+  if (!stored) {
+    // First run — show setup
+    document.getElementById('lockSub').textContent = 'Welcome! Set a password to protect your data.';
+    document.getElementById('lockInput').style.display = 'none';
+    document.querySelector('.lock-btn').style.display = 'none';
+    document.getElementById('lockHint').textContent = '';
+    document.getElementById('lockSetup').style.display = 'block';
+    document.getElementById('newPwd1').focus();
+  } else {
+    document.getElementById('lockInput').focus();
+    document.getElementById('lockHint').textContent = 'Forgot password? Go to Settings after unlocking.';
+  }
+}
+
+async function savePassword() {
+  const p1 = document.getElementById('newPwd1').value;
+  const p2 = document.getElementById('newPwd2').value;
+  if (!p1) { document.getElementById('lockErr').textContent = 'Password cannot be empty.'; return; }
+  if (p1 !== p2) { document.getElementById('lockErr').textContent = 'Passwords do not match.'; return; }
+  localStorage.setItem('psx_pwd_hash', await hashPwd(p1));
+  unlockDirect();
+}
+
+async function unlockApp() {
+  const pwd = document.getElementById('lockInput').value;
+  const hash = await hashPwd(pwd);
+  if (hash === localStorage.getItem('psx_pwd_hash')) {
+    unlockDirect();
+  } else {
+    document.getElementById('lockErr').textContent = 'Incorrect password. Try again.';
+    document.getElementById('lockInput').value = '';
+    document.getElementById('lockInput').focus();
+  }
+}
+
+function unlockDirect() {
+  document.getElementById('lockScreen').style.display = 'none';
+  load();
+  renderAll();
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('t-date').value = today;
+  document.getElementById('d-date').value = today;
+}
+
+function lockApp() {
+  document.getElementById('lockInput').value = '';
+  document.getElementById('lockErr').textContent = '';
+  document.getElementById('lockScreen').style.display = 'flex';
+  document.getElementById('lockInput').focus();
+}
+
+async function changePassword() {
+  const cur = document.getElementById('s-cur-pwd').value;
+  const p1  = document.getElementById('s-new-pwd1').value;
+  const p2  = document.getElementById('s-new-pwd2').value;
+  const msg = document.getElementById('pwd-msg');
+  const curHash = await hashPwd(cur);
+  if (curHash !== localStorage.getItem('psx_pwd_hash')) { msg.style.color='var(--red)'; msg.textContent='Current password is incorrect.'; return; }
+  if (!p1) { msg.style.color='var(--red)'; msg.textContent='New password cannot be empty.'; return; }
+  if (p1 !== p2) { msg.style.color='var(--red)'; msg.textContent='New passwords do not match.'; return; }
+  localStorage.setItem('psx_pwd_hash', await hashPwd(p1));
+  ['s-cur-pwd','s-new-pwd1','s-new-pwd2'].forEach(id=>document.getElementById(id).value='');
+  msg.style.color='var(--accent)'; msg.textContent='Password changed successfully.';
+}
+
+async function removePassword() {
+  if (!confirm('Remove password protection? Anyone can open this tracker.')) return;
+  const cur = document.getElementById('s-cur-pwd').value;
+  const curHash = await hashPwd(cur);
+  if (curHash !== localStorage.getItem('psx_pwd_hash')) {
+    document.getElementById('pwd-msg').style.color='var(--red)';
+    document.getElementById('pwd-msg').textContent='Current password is incorrect.'; return;
+  }
+  localStorage.removeItem('psx_pwd_hash');
+  document.getElementById('pwd-msg').style.color='var(--yellow)';
+  document.getElementById('pwd-msg').textContent='Password removed. Reload to re-enable.';
+}
+
+// ═══════════════════════════════════════════════════
+// STATE & PERSISTENCE
+// ═══════════════════════════════════════════════════
+let state = { transactions:[], dividends:[], prices:{}, editTarget:null };
+
+function save() { localStorage.setItem('psx_tracker_v2', JSON.stringify(state)); }
+function load() {
+  try { const s=localStorage.getItem('psx_tracker_v2'); if(s) state=JSON.parse(s); } catch(e){}
+}
+
+let _id = Date.now();
+function uid() { return (++_id).toString(36); }
+
+// ═══════════════════════════════════════════════════
+// GOOGLE DRIVE — EXPORT / IMPORT
+// ═══════════════════════════════════════════════════
+function exportToGDrive() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    version: 2,
+    transactions: state.transactions,
+    dividends: state.dividends,
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10);
+  a.href     = url;
+  a.download = `psx-portfolio-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  notify('✓ Backup downloaded — upload it to Google Drive');
+}
+
+function openGdriveModal() {
+  document.getElementById('importJson').value = '';
+  document.getElementById('gdriveModal').classList.add('open');
+}
+function closeGdriveModal() { document.getElementById('gdriveModal').classList.remove('open'); }
+
+function doImport() {
+  const raw = document.getElementById('importJson').value.trim();
+  if (!raw) { notify('Paste your backup JSON first.'); return; }
+  try {
+    const data = JSON.parse(raw);
+    if (!data.transactions || !data.dividends) throw new Error('Invalid format');
+    if (!confirm(`Import ${data.transactions.length} transactions and ${data.dividends.length} dividend records? This will MERGE with existing data.`)) return;
+    // Merge by ID (avoid duplicates)
+    const txIds  = new Set(state.transactions.map(t=>t.id));
+    const divIds = new Set(state.dividends.map(d=>d.id));
+    data.transactions.forEach(t => { if(!txIds.has(t.id)) state.transactions.push(t); });
+    data.dividends.forEach(d => { if(!divIds.has(d.id)) state.dividends.push(d); });
+    save(); renderAll(); closeGdriveModal();
+    notify(`✓ Imported successfully`);
+  } catch(e) {
+    notify('Invalid JSON — paste the full backup file contents.');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
+  document.getElementById('page-'+name).classList.add('active');
+  renderAll();
+}
+
+function notify(msg) {
+  const el=document.getElementById('notif');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+// ═══════════════════════════════════════════════════
+// FORMAT HELPERS
+// ═══════════════════════════════════════════════════
+function fmt(n,dec=2){if(n==null||isNaN(n))return'—';return Number(n).toLocaleString('en-PK',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
+function fmtPKR(n){return'PKR '+fmt(n);}
+function fmtPct(n){if(n==null||isNaN(n))return'—';return(n>=0?'+':'')+fmt(n)+'%';}
+function colorClass(n){return n>0?'pos':n<0?'neg':'neu';}
+
+// ═══════════════════════════════════════════════════
+// PORTFOLIO CALCULATIONS
+// ═══════════════════════════════════════════════════
+function buildHoldings() {
+  const lots={},realised={};
+  [...state.transactions].sort((a,b)=>a.date.localeCompare(b.date)).forEach(tx=>{
+    const sym=tx.symbol;
+    if(!lots[sym])lots[sym]=[];
+    if(!realised[sym])realised[sym]=0;
+    if(tx.type==='buy'){
+      lots[sym].push({shares:+tx.shares,price:+tx.price});
+    } else {
+      let toSell=+tx.shares; const sp=+tx.price;
+      while(toSell>0&&lots[sym].length>0){
+        const lot=lots[sym][0],sold=Math.min(lot.shares,toSell);
+        realised[sym]+=sold*(sp-lot.price);
+        lot.shares-=sold; toSell-=sold;
+        if(lot.shares<=0)lots[sym].shift();
+      }
+    }
+  });
+  const holdings={};
+  Object.keys(lots).forEach(sym=>{
+    const rem=lots[sym].reduce((s,l)=>s+l.shares,0);
+    if(rem<=0)return;
+    const totalCost=lots[sym].reduce((s,l)=>s+l.shares*l.price,0);
+    holdings[sym]={symbol:sym,shares:rem,avgCost:totalCost/rem,totalCost,realised:realised[sym]||0};
+  });
+  return{holdings,realised};
+}
+
+function totalDividendsBySym(sym){
+  return state.dividends.filter(d=>d.symbol===sym&&d.type==='cash').reduce((s,d)=>s+Number(d.total||0),0);
+}
+
+// ═══════════════════════════════════════════════════
+// LIVE PRICE FETCHING
+// ═══════════════════════════════════════════════════
+async function fetchPrice(symbol){
+  for(const base of['https://query1.finance.yahoo.com','https://query2.finance.yahoo.com']){
+    try{
+      const res=await fetch(`${base}/v8/finance/chart/${symbol}.KA?interval=1d&range=1d`);
+      if(!res.ok)continue;
+      const data=await res.json();
+      const meta=data?.chart?.result?.[0]?.meta;
+      if(!meta)continue;
+      const price=meta.regularMarketPrice;
+      const prev=meta.previousClose||meta.chartPreviousClose;
+      return{price,change:prev?((price-prev)/prev*100):0,source:'Yahoo Finance',updatedAt:new Date().toLocaleTimeString()};
+    }catch(e){}
+  }
+  return null;
+}
+
+async function fetchAllPrices(){
+  const{holdings}=buildHoldings();
+  const syms=Object.keys(holdings);
+  if(!syms.length){notify('No holdings to fetch prices for.');return;}
+  document.getElementById('lastUpdate').textContent='Fetching…';
+  let fetched=0;
+  for(const sym of syms){const r=await fetchPrice(sym);if(r){state.prices[sym]=r;fetched++;}}
+  save();
+  document.getElementById('lastUpdate').textContent=`Updated ${new Date().toLocaleTimeString()}`;
+  notify(`Fetched prices for ${fetched}/${syms.length} symbols`);
+  renderAll();
+}
+
+async function lookupPrice(){
+  const sym=document.getElementById('lookup-symbol').value.trim();
+  if(!sym)return;
+  document.getElementById('lookup-result').innerHTML='<span style="color:var(--muted)">Fetching…</span>';
+  const r=await fetchPrice(sym);
+  if(r){
+    state.prices[sym]=r; save(); renderPriceTable(); renderPortfolio();
+    document.getElementById('lookup-result').innerHTML=
+      `<span class="symbol-badge">${sym}</span>&nbsp;<span style="color:var(--text)">${fmt(r.price)} PKR</span>&nbsp;<span class="${colorClass(r.change)}">${fmtPct(r.change)}</span>`;
+  }else{
+    document.getElementById('lookup-result').innerHTML='<span style="color:var(--red)">Not found — try manual override below.</span>';
+  }
+}
+
+function setManualPrice(){
+  const sym=document.getElementById('mp-symbol').value.trim();
+  const price=parseFloat(document.getElementById('mp-price').value);
+  if(!sym||isNaN(price)){notify('Enter a symbol and price.');return;}
+  state.prices[sym]={price,change:0,source:'Manual',updatedAt:new Date().toLocaleTimeString()};
+  save();renderAll();notify(`Price set: ${sym} = PKR ${fmt(price)}`);
+}
+
+// ═══════════════════════════════════════════════════
+// TRANSACTIONS CRUD
+// ═══════════════════════════════════════════════════
+function addTransaction(){
+  const sym=document.getElementById('t-symbol').value.trim().toUpperCase();
+  const type=document.getElementById('t-type').value;
+  const date=document.getElementById('t-date').value;
+  const shr=parseFloat(document.getElementById('t-shares').value);
+  const price=parseFloat(document.getElementById('t-price').value);
+  const brok=parseFloat(document.getElementById('t-brokerage').value)||0;
+  const notes=document.getElementById('t-notes').value.trim();
+  if(!sym||!date||isNaN(shr)||isNaN(price)){notify('Fill in Symbol, Date, Shares, and Price.');return;}
+  state.transactions.push({id:uid(),symbol:sym,type,date,shares:shr,price,brokerage:brok,notes});
+  save();renderAll();clearTransactionForm();notify(`${type.toUpperCase()} ${shr} × ${sym} added`);
+}
+
+function clearTransactionForm(){
+  ['t-symbol','t-date','t-shares','t-price','t-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('t-brokerage').value='0';
+  document.getElementById('t-type').value='buy';
+}
+
+function deleteTransaction(id){
+  if(!confirm('Delete this transaction?'))return;
+  state.transactions=state.transactions.filter(t=>t.id!==id);
+  save();renderAll();notify('Transaction deleted');
+}
+
+// ═══════════════════════════════════════════════════
+// DIVIDENDS CRUD
+// ═══════════════════════════════════════════════════
+function updateDivForm(){
+  const type=document.getElementById('d-type').value;
+  document.getElementById('d-amount-label').textContent=
+    type==='cash'?'Dividend per Share (PKR)':type==='bonus'?'Bonus Ratio (e.g. 0.10 = 10%)':'Rights Price per Share (PKR)';
+}
+
+function addDividend(){
+  const sym=document.getElementById('d-symbol').value.trim().toUpperCase();
+  const type=document.getElementById('d-type').value;
+  const date=document.getElementById('d-date').value;
+  const amount=parseFloat(document.getElementById('d-amount').value);
+  const held=parseFloat(document.getElementById('d-shares-held').value)||0;
+  const notes=document.getElementById('d-notes').value.trim();
+  if(!sym||!date||isNaN(amount)){notify('Fill in Symbol, Date, and Rate/Amount.');return;}
+  const total=type==='bonus'?Math.floor(held*amount):amount*held;
+  state.dividends.push({id:uid(),symbol:sym,type,date,amount,held,total,notes});
+  save();renderAll();clearDividendForm();notify(`${type} for ${sym} recorded`);
+}
+
+function clearDividendForm(){
+  ['d-symbol','d-date','d-amount','d-shares-held','d-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('d-type').value='cash'; updateDivForm();
+}
+
+function deleteDividend(id){
+  if(!confirm('Delete this record?'))return;
+  state.dividends=state.dividends.filter(d=>d.id!==id);
+  save();renderAll();notify('Record deleted');
+}
+
+// ═══════════════════════════════════════════════════
+// EDIT MODAL
+// ═══════════════════════════════════════════════════
+function openEditTransaction(id){
+  const tx=state.transactions.find(t=>t.id===id); if(!tx)return;
+  state.editTarget={type:'tx',id};
+  document.getElementById('modalTitle').textContent='Edit Transaction';
+  document.getElementById('modalFormGrid').innerHTML=`
+    <div class="form-group"><label>Symbol</label><input id="e-symbol" value="${tx.symbol}"/></div>
+    <div class="form-group"><label>Type</label><select id="e-type"><option value="buy" ${tx.type==='buy'?'selected':''}>Buy</option><option value="sell" ${tx.type==='sell'?'selected':''}>Sell</option></select></div>
+    <div class="form-group"><label>Date</label><input id="e-date" type="date" value="${tx.date}"/></div>
+    <div class="form-group"><label>Shares</label><input id="e-shares" type="number" value="${tx.shares}"/></div>
+    <div class="form-group"><label>Price (PKR)</label><input id="e-price" type="number" value="${tx.price}"/></div>
+    <div class="form-group"><label>Brokerage (PKR)</label><input id="e-brokerage" type="number" value="${tx.brokerage||0}"/></div>
+    <div class="form-group"><label>Notes</label><input id="e-notes" value="${tx.notes||''}"/></div>`;
+  document.getElementById('editModal').classList.add('open');
+}
+
+function openEditDividend(id){
+  const d=state.dividends.find(x=>x.id===id); if(!d)return;
+  state.editTarget={type:'div',id};
+  document.getElementById('modalTitle').textContent='Edit Record';
+  document.getElementById('modalFormGrid').innerHTML=`
+    <div class="form-group"><label>Symbol</label><input id="e-symbol" value="${d.symbol}"/></div>
+    <div class="form-group"><label>Type</label><select id="e-type"><option value="cash" ${d.type==='cash'?'selected':''}>Cash</option><option value="bonus" ${d.type==='bonus'?'selected':''}>Bonus</option><option value="rights" ${d.type==='rights'?'selected':''}>Rights</option></select></div>
+    <div class="form-group"><label>Date</label><input id="e-date" type="date" value="${d.date}"/></div>
+    <div class="form-group"><label>Amount/Rate</label><input id="e-amount" type="number" value="${d.amount}"/></div>
+    <div class="form-group"><label>Shares Held</label><input id="e-held" type="number" value="${d.held||0}"/></div>
+    <div class="form-group"><label>Notes</label><input id="e-notes" value="${d.notes||''}"/></div>`;
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeModal(){document.getElementById('editModal').classList.remove('open');state.editTarget=null;}
+
+function saveEdit(){
+  const et=state.editTarget; if(!et)return;
+  if(et.type==='tx'){
+    const idx=state.transactions.findIndex(t=>t.id===et.id); if(idx<0)return;
+    state.transactions[idx]={...state.transactions[idx],
+      symbol:document.getElementById('e-symbol').value.toUpperCase(),
+      type:document.getElementById('e-type').value,
+      date:document.getElementById('e-date').value,
+      shares:parseFloat(document.getElementById('e-shares').value),
+      price:parseFloat(document.getElementById('e-price').value),
+      brokerage:parseFloat(document.getElementById('e-brokerage').value)||0,
+      notes:document.getElementById('e-notes').value};
+  }else{
+    const idx=state.dividends.findIndex(d=>d.id===et.id); if(idx<0)return;
+    const amount=parseFloat(document.getElementById('e-amount').value);
+    const held=parseFloat(document.getElementById('e-held').value)||0;
+    const type=document.getElementById('e-type').value;
+    const total=type==='bonus'?Math.floor(held*amount):amount*held;
+    state.dividends[idx]={...state.dividends[idx],
+      symbol:document.getElementById('e-symbol').value.toUpperCase(),
+      type,date:document.getElementById('e-date').value,amount,held,total,
+      notes:document.getElementById('e-notes').value};
+  }
+  save();renderAll();closeModal();notify('Saved');
+}
+
+// ═══════════════════════════════════════════════════
+// CLEAR ALL DATA
+// ═══════════════════════════════════════════════════
+function clearAllData(){
+  if(!confirm('This will permanently delete ALL your transactions, dividends and prices. Are you sure?'))return;
+  if(!confirm('FINAL WARNING: This cannot be undone. Continue?'))return;
+  state={transactions:[],dividends:[],prices:{},editTarget:null};
+  save();renderAll();notify('All data cleared');
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════
+function renderAll(){renderPortfolio();renderTransactions();renderDividends();renderPriceTable();}
+
+function renderPortfolio(){
+  const{holdings,realised}=buildHoldings();
+  const syms=Object.keys(holdings);
+  let ti=0,tm=0,tp=0,tr=0,td=0;
+  const rows=syms.map(sym=>{
+    const h=holdings[sym],p=state.prices[sym];
+    const lp=p?p.price:null,mv=lp!=null?lp*h.shares:null;
+    const pnl=mv!=null?mv-h.totalCost:null,pnlPct=pnl!=null?pnl/h.totalCost*100:null;
+    const dc=p?p.change:null,divs=totalDividendsBySym(sym);
+    ti+=h.totalCost; if(mv!=null)tm+=mv; if(pnl!=null)tp+=pnl;
+    tr+=realised[sym]||0; td+=divs;
+    return`<tr>
+      <td><span class="symbol-badge">${sym}</span></td>
+      <td>${fmt(h.shares,0)}</td><td>${fmt(h.avgCost)}</td><td>${fmt(h.totalCost)}</td>
+      <td>${lp!=null?`<span class="live-dot"></span>${fmt(lp)}`:'<span style="color:var(--muted)">—</span>'}</td>
+      <td>${mv!=null?fmt(mv):'<span style="color:var(--muted)">—</span>'}</td>
+      <td class="${pnl!=null?colorClass(pnl):''}">${pnl!=null?(pnl>=0?'+':'')+fmt(pnl):'—'}</td>
+      <td class="${pnlPct!=null?colorClass(pnlPct):''}">${pnlPct!=null?fmtPct(pnlPct):'—'}</td>
+      <td class="${dc!=null?colorClass(dc):''}">${dc!=null?fmtPct(dc):'—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('holdingsBody').innerHTML=rows||`<tr><td colspan="9"><div class="empty"><div class="empty-icon">📊</div>No holdings yet — add a transaction to get started.</div></td></tr>`;
+  document.getElementById('holdingsBadge').textContent=syms.length+' stocks';
+  const pc=colorClass(tp);
+  document.getElementById('sum-invested').textContent=fmtPKR(ti);
+  document.getElementById('sum-mktval').textContent=tm?fmtPKR(tm):'PKR —';
+  document.getElementById('sum-pnl').className='stat-value '+pc;
+  document.getElementById('sum-pnl').textContent=tm?(tp>=0?'+':'')+fmtPKR(tp):'PKR —';
+  document.getElementById('sum-pnl-pct').textContent=tm&&ti?fmtPct(tp/ti*100):'—';
+  document.getElementById('sum-pnl-pct').className='stat-sub '+pc;
+  document.getElementById('sum-realised').className='stat-value '+colorClass(tr);
+  document.getElementById('sum-realised').textContent=(tr>=0?'+':'')+fmtPKR(tr);
+  document.getElementById('sum-div').textContent=fmtPKR(td);
+  document.getElementById('sum-count').textContent=syms.length;
+}
+
+function renderTransactions(){
+  const sorted=[...state.transactions].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('txBadge').textContent=sorted.length+' records';
+  if(!sorted.length){document.getElementById('txBody').innerHTML=`<tr><td colspan="9"><div class="empty"><div class="empty-icon">📋</div>No transactions yet.</div></td></tr>`;return;}
+  document.getElementById('txBody').innerHTML=sorted.map(tx=>`
+    <tr>
+      <td>${tx.date}</td>
+      <td><span class="symbol-badge">${tx.symbol}</span></td>
+      <td><span style="color:${tx.type==='buy'?'var(--accent)':'var(--red)'};font-weight:600">${tx.type.toUpperCase()}</span></td>
+      <td>${fmt(tx.shares,0)}</td><td>${fmt(tx.price)}</td><td>${fmt(tx.brokerage||0)}</td>
+      <td>${fmt(tx.shares*tx.price+(tx.brokerage||0))}</td>
+      <td style="color:var(--muted)">${tx.notes||'—'}</td>
+      <td><div class="action-btns">
+        <button class="btn-sm btn-edit" onclick="openEditTransaction('${tx.id}')">Edit</button>
+        <button class="btn-sm btn-del" onclick="deleteTransaction('${tx.id}')">Del</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+function renderDividends(){
+  const sorted=[...state.dividends].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('divBadge').textContent=sorted.length+' records';
+  if(!sorted.length){document.getElementById('divBody').innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">💰</div>No dividends or corporate actions recorded.</div></td></tr>`;return;}
+  document.getElementById('divBody').innerHTML=sorted.map(d=>{
+    const tl=d.type==='cash'?'Cash Dividend':d.type==='bonus'?'Bonus Shares':'Rights Issue';
+    const tc=d.type==='cash'?'div-cash':d.type==='bonus'?'div-bonus':'div-rights';
+    const tot=d.type==='bonus'?fmt(d.total,0)+' shares':fmtPKR(d.total);
+    return`<tr>
+      <td>${d.date}</td><td><span class="symbol-badge">${d.symbol}</span></td>
+      <td><span class="div-type ${tc}">${tl}</span></td>
+      <td>${fmt(d.amount)}</td><td>${fmt(d.held||0,0)}</td>
+      <td class="pos">${tot}</td>
+      <td style="color:var(--muted)">${d.notes||'—'}</td>
+      <td><div class="action-btns">
+        <button class="btn-sm btn-edit" onclick="openEditDividend('${d.id}')">Edit</button>
+        <button class="btn-sm btn-del" onclick="deleteDividend('${d.id}')">Del</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPriceTable(){
+  const entries=Object.entries(state.prices);
+  if(!entries.length){document.getElementById('priceBody').innerHTML=`<tr><td colspan="4"><div class="empty"><div class="empty-icon">📡</div>No prices fetched yet.</div></td></tr>`;return;}
+  document.getElementById('priceBody').innerHTML=entries.map(([sym,p])=>`
+    <tr>
+      <td><span class="symbol-badge">${sym}</span></td>
+      <td>${fmt(p.price)} PKR</td>
+      <td style="color:var(--muted)">${p.source}</td>
+      <td style="color:var(--muted)">${p.updatedAt}</td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+initLock();
+</script>
+</body>
+</html>
